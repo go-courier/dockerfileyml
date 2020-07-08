@@ -38,6 +38,10 @@ func TestDockerfile(t *testing.T) {
 
 		d.Stages = map[string]*Stage{
 			"builder": {
+				Arg: Values{
+					"COMMIT_SHA":   "",
+					"PROJECT_NAME": "",
+				},
 				From:       "busybox",
 				WorkingDir: "/go/src",
 				Run:        Scripts("touch a.txt", "touch b.txt"),
@@ -54,8 +58,8 @@ func TestDockerfile(t *testing.T) {
 		d.From = "busybox"
 		d.WorkingDir = "/todo"
 		d.Copy = Values{
-			"builder:./a.txt":  "./",
-			"builder2:./b.txt": "./",
+			"builder:./a.txt":        "./",
+			"builder2:/go/src/b.txt": "./",
 		}
 
 		buf := bytes.NewBuffer(nil)

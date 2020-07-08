@@ -32,7 +32,8 @@ type Stage struct {
 	Label      map[string]string `yaml:"label,omitempty" docker:"LABEL,multi" `
 	WorkingDir string            `yaml:"workdir" docker:"WORKDIR" `
 
-	Env  Values   `yaml:"env,omitempty" docker:"ENV,multi"`
+	Arg  Values   `yaml:"arg,omitempty" docker:"ARG,multi"`
+	Env  Values   `yaml:"env,omitempty" docker:"ENV,multi,inline"`
 	Add  Values   `yaml:"add,omitempty" docker:"ADD,join"`
 	Copy Values   `yaml:"copy,omitempty" docker:"COPY"`
 	Run  []string `yaml:"run,omitempty" docker:"RUN,script"`
@@ -70,13 +71,20 @@ func scanAndValidate(s *Stage, stages map[string]*Stage) error {
 					s.copyReplaces = map[string]string{}
 				}
 
-				s.copyReplaces[from] = "--from=" + stageName + " " + filepath.Join(stage.WorkingDir, parts[1])
+				s.copyReplaces[from] = "--from=" + stageName + " " + joinIfNeed(stage.WorkingDir, parts[1])
 			} else {
 				return fmt.Errorf("missing stage %s", stageName)
 			}
 		}
 	}
 	return nil
+}
+
+func joinIfNeed(src string, to string) string {
+	if len(to) > 0 && to[0] == '/' {
+		return to
+	}
+	return filepath.Join(src, to)
 }
 
 func WriteToDockerfile(w io.Writer, d Dockerfile) error {
@@ -208,6 +216,7 @@ func writeState(w io.Writer, stage *Stage) error {
 
 			case reflect.Map:
 				multi := stringIncludes(dockerFlags, "multi")
+				inline := stringIncludes(dockerFlags, "inline")
 				join := stringIncludes(dockerFlags, "join")
 
 				if join {
@@ -244,14 +253,20 @@ func writeState(w io.Writer, stage *Stage) error {
 					sort.Strings(keys)
 
 					if multi {
-						keyValues := make([]string, 0)
+						if inline {
+							keyValues := make([]string, 0)
 
-						for _, key := range keys {
-							keyValues = append(keyValues, key+"="+mayQuote(values[key]))
-						}
+							for _, key := range keys {
+								keyValues = append(keyValues, key+"="+mayQuote(values[key]))
+							}
 
-						if len(keyValues) > 0 {
-							write(dockerKey, keyValues...)
+							if len(keyValues) > 0 {
+								write(dockerKey, keyValues...)
+							}
+						} else {
+							for _, key := range keys {
+								write(dockerKey, key+"="+mayQuote(values[key]))
+							}
 						}
 					} else {
 						for _, key := range keys {

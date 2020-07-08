@@ -1,5 +1,7 @@
 FROM busybox as builder
 WORKDIR /go/src
+ARG COMMIT_SHA=""
+ARG PROJECT_NAME=""
 RUN touch a.txt && touch b.txt
 FROM busybox as builder2
 WORKDIR /go/src
