@@ -25,7 +25,7 @@ func TestDockerfile(t *testing.T) {
 		}
 
 		d.Entrypoint = Args("sh")
-		d.Command = Args("-c", "echo", ContainerEnvVar(key))
+		d.Command = Args("-c", "echo", EnvVar(key))
 
 		buf := bytes.NewBuffer(nil)
 		err := WriteToDockerfile(buf, d)
@@ -42,9 +42,9 @@ func TestDockerfile(t *testing.T) {
 					"COMMIT_SHA":   "",
 					"PROJECT_NAME": "",
 				},
-				From:       "busybox",
+				From:       "--platform=${BUILDPLATFORM:-linux/amd64} busybox",
 				WorkingDir: "/go/src",
-				Run:        Scripts("touch a.txt", "touch b.txt"),
+				Run:        Scripts("echo ${TARGETPLATFORM} > a.txt", "touch b.txt"),
 			},
 			"builder2": {
 				From:       "busybox",

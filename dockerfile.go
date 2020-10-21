@@ -132,6 +132,14 @@ func writeState(w io.Writer, stage *Stage) error {
 			return
 		}
 
+		for _, v := range values {
+			if args := containsGlobalArgs(v); len(args) > 0 {
+				for _, arg := range args {
+					_, _ = io.WriteString(w, "ARG "+arg+"\n")
+				}
+			}
+		}
+
 		_, _ = io.WriteString(w, dockerKey)
 
 		for i := range values {
@@ -142,7 +150,7 @@ func writeState(w io.Writer, stage *Stage) error {
 			switch dockerKey {
 			case "FROM":
 				if stage.name != "" {
-					v += " as " + stage.name
+					v += " AS " + stage.name
 				}
 			case "COPY":
 				if stage.copyReplaces != nil {
@@ -150,12 +158,14 @@ func writeState(w io.Writer, stage *Stage) error {
 						v = replaced
 					}
 				}
+			case "ENV":
+				v = mayQuote(v)
 			}
 
 			_, _ = io.WriteString(w, v)
 		}
 
-		_, _ = io.WriteString(w, "\n")
+		_, _ = io.WriteString(w, "\n\n")
 	}
 
 	rv := reflect.Indirect(reflect.ValueOf(stage))
@@ -174,12 +184,7 @@ func writeState(w io.Writer, stage *Stage) error {
 			switch field.Type.Kind() {
 			case reflect.String:
 				if len(value.String()) > 0 {
-					inline := stringIncludes(dockerFlags, "inline")
-					if inline {
-						write(dockerKey, value.String())
-					} else {
-						write(dockerKey, mayQuote(value.String()))
-					}
+					write(dockerKey, value.String())
 				}
 			case reflect.Slice:
 				jsonArray := stringIncludes(dockerFlags, "array")
@@ -301,4 +306,24 @@ func stringSome(list []string, checker func(item string, i int) bool) bool {
 		}
 	}
 	return false
+}
+
+var globalArgs = []string{
+	"TARGETPLATFORM",
+	"TARGETOS",
+	"TARGETARCH",
+	"TARGETVARIANT",
+	"BUILDPLATFORM",
+	"BUILDOS",
+	"BUILDARCH",
+	"BUILDVARIANT",
+}
+
+func containsGlobalArgs(s string) (args []string) {
+	for _, arg := range globalArgs {
+		if strings.Contains(s, arg) {
+			args = append(args, arg)
+		}
+	}
+	return
 }
